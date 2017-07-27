@@ -6,6 +6,7 @@ var fs=require('fs');
 var path=require('path');
 var url=require('url');
 var mime=require('mime');
+var querystring=require("querystring");
 
 // 创建服务，并监听request事件
 var server=http.createServer(function(req,res){
@@ -75,7 +76,54 @@ var server=http.createServer(function(req,res){
 		});
 
 	}else if(reqUrl==="/add"&&req.method.toLowerCase()==="post"){
+		// 表示 post 方式提交数据
+		// 获取用户提交过来的数据
 
+		fs.readFile(path.join(__dirname,"data","data.json"),'utf-8',function(err,data){
+			if(err&&!err==="ENOENT"){
+				throw err;
+			}else{
+				var list=JSON.parse(data||'[]');
+
+				var arr=[];//空数组接收post数据
+
+				// 获取post方式的数据，需要监听request对象的data和end事件
+				req.on("data",function(chunk){
+					// 该事件中获取请求的数据是一片一片的提交过来的
+					// chunk是一个二进制对象
+					arr.push(chunk);
+				});
+				req.on("end",function(){
+        			// 当该事件被触发的时候，表示用户数据都接收完毕了
+        			// 把arr数组中的每一个buffer对象拼接起来，最终要生成Buffer对象
+        			var buffer = Buffer.concat(arr);
+
+        			// 把Buffer对象转换为字符串，title=biaoti&url=lujing&text=hahahaha
+        			var reqBody=buffer.toString('utf-8');
+
+        			// querystring，通过该模块可以把一个查询字符串转化成json对象
+        			reqBody=querystring.parse(reqBody);
+
+        			// 将新数据加入数据文本中
+        			list.push(reqBody);
+
+        			fs.writeFile(path.join(__dirname,"data","data.json"),JSON.stringify(list),'utf-8',function(err){
+        				if(err){
+        					throw err;
+        				}else{
+        					console.log("写入成功！");
+
+        					// 执行重定向操作：通过服务器向浏览器响应一个http报文头来实现
+        					// 设置响应状态码
+        					res.statusCode=302;
+        					res.statusMessage="Found";
+        					res.setHeader("Location","/");
+        					res.end();
+        				}
+        			})
+				})
+			}
+		})
 	}else if(reqUrl.startsWith("/resources")){
 
 		// 如果请求是以 /resources 开头的，表示请求的是静态资源
@@ -106,4 +154,19 @@ function render(res){
 			res.end(data);
 		})
 	}
+}
+
+// 获取request数据
+
+// 封装获取data.json数据
+
+function readDataJson(callBack){
+	fs.readFile(path.join(__dirname,"data","data.json"),"utf-8",function(req,res){
+		if(err&&!err==="ENOENT"){
+			throw err;
+		}else{
+			var list=JSON.parse(data||'[]');
+			callback(list);
+		}
+	})
 }
