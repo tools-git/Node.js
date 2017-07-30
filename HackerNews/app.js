@@ -31,11 +31,33 @@ var server=http.createServer(function(req,res){
 	res.setHeader("Content-Type","text/html;charset=utf-8")
 
 	if(reqUrl === "/" || reqUrl ==="/index"){
-		res.render(path.join(__dirname,"views","index.html"));
+		
+
+		// 在 index 页面中渲染数据
+		// 获取data.json中的数据
+		readDataJson(function(list){
+			res.render(path.join(__dirname,"views","index.html"),{"pagetitle":"news list","list":list});
+		})
 
 	}else if(reqUrl==="/details"){
-		res.render(path.join(__dirname,"views","details.html"));
 
+		// 获取data.json中的数据
+		readDataJson(function(list){
+
+			var model;
+			for(var i=0;i<list.length;i++){
+				if(list[i].id===parseInt(urlObj.query.id)){
+					model=list[i];
+					break;
+				}
+			}
+			console.log(model);
+			if(model){
+				res.render(path.join(__dirname,"views","details.html"),{"list":model});
+			}else{
+				res.end("No Such Item.")
+			}
+		})
 	}else if(reqUrl==="/submit"){
 		res.render(path.join(__dirname,"views","submit.html"));
 
@@ -56,7 +78,12 @@ var server=http.createServer(function(req,res){
 		// 	var list = JSON.parse(data||'[]');
 
 		readDataJson(function(list){
+
+			// 在 push 数据到 list 前，为每条新闻添加一个 id
+      		// 做了一个假的自增
 			// 将urlObj.query加入list数组中
+			urlObj.query.id=list.length;
+
 			list.push(urlObj.query);
 
 			// 将数组写入data.json文件中
@@ -100,13 +127,16 @@ var server=http.createServer(function(req,res){
    //  			// 当该事件被触发的时候，表示用户数据都接收完毕了
    //  			// 把arr数组中的每一个buffer对象拼接起来，最终要生成Buffer对象
    //  			var buffer = Buffer.concat(arr);
-   
+
    			getPostData(req,function(buffer){
     			// 把Buffer对象转换为字符串，title=biaoti&url=lujing&text=hahahaha
     			var reqBody=buffer.toString('utf-8');
 
     			// querystring，通过该模块可以把一个查询字符串转化成json对象
     			reqBody=querystring.parse(reqBody);
+
+    			// 为每条新闻添加一个 id
+    			reqBody.id=list.length;
 
     			// 将新数据加入数据文本中
     			list.push(reqBody);
@@ -147,10 +177,15 @@ server.listen(8080,function(){
 
 // 封装一个渲染方法挂载在res下
 function render(res){
-	res.render=function(filename){
+	res.render=function(filename,tepData){
 		fs.readFile(filename,function(err,data){
 			if(err){
 				throw err;
+			}
+			// 判断是否需要替换模板
+			if(tepData){	
+				var compiled=_.template(data.toString());
+				data=compiled(tepData);
 			}
 			// 设置正确的mime类型
 			res.setHeader('Content-Type',mime.lookup(filename));
